@@ -5,11 +5,13 @@ import (
 	"testing"
 )
 
-func TestSignMessage(t *testing.T) {
+func TestEchoHelloWorld(t *testing.T) {
 	var message = "hello-world"
 
-	var result []byte
-	result = SignMessage(message)
+	result, err := SignMessage(message)
+	if err != nil {
+		t.Errorf("Error creating message: %s", err)
+	}
 
 	msg := SignedMessage{}
 	if err := json.Unmarshal(result, &msg); err != nil {
@@ -20,5 +22,21 @@ func TestSignMessage(t *testing.T) {
 		t.Errorf(
 			"Expected message to be \"hello-world\", but got %s",
 			msg.Message)
+	}
+}
+
+func TestCharacterLimit(t *testing.T) {
+	var message = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+
+	_, err := SignMessage(message)
+	if err == nil {
+		t.Errorf("Expected there to be an error at 251 characters")
+	}
+
+	message = "**********************************************************************************************************************************************************************************************************************************************************"
+
+	_, err = SignMessage(message)
+	if err != nil {
+		t.Errorf("Did not expect error at 250 characters: %s", err)
 	}
 }
