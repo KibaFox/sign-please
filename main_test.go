@@ -1,14 +1,37 @@
 package main
 
 import (
+	"crypto/ecdsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"testing"
 )
 
-func TestEchoHelloWorld(t *testing.T) {
-	var message = "hello-world"
+// This constant contains an ecdsa private key as a string in PEM format where
+// the payload is encoded in ASN.1, DER format.
+const EcdsaPrivateKey = `
+-----BEGIN ECDSA PRIVATE KEY-----
+MIGkAgEBBDDRwBjK8SS7R1etLPfQ0oHI+Njc97FrxNqFfee0KQEh4/Ww2lSQ230q
+hfQfHAaNAAGgBwYFK4EEACKhZANiAASeppu7RMiU0QzmxgDd9pH0WcTf+voZCiM0
+HWLt1X1X+ZfkTxjmDbzMwKJxmumU5/9AIzX1C/Qsav6AfeClkEXC9UV3L9LuH2dz
+ugBjTYxzRJbip7ySLoQTP0/UDMj5SJo=
+-----END ECDSA PRIVATE KEY-----`
 
-	result, err := SignMessage(message)
+// Gets the ECDSA private key from the constant.
+// It returns an ecdsa.PrivateKey.
+func getEcdsaPrivKey() *ecdsa.PrivateKey {
+	privBlk, _ := pem.Decode([]byte(EcdsaPrivateKey))
+	privKey, _ := x509.ParseECPrivateKey(privBlk.Bytes)
+	return privKey
+}
+
+func TestEchoHelloWorld(t *testing.T) {
+	t.Log("Using message \"hello-world\"... (expecting \"hello-world\")")
+
+	message := "hello-world"
+
+	result, err := SignMessage(message, getEcdsaPrivKey())
 	if err != nil {
 		t.Errorf("Error creating message: %s", err)
 	}
@@ -25,17 +48,23 @@ func TestEchoHelloWorld(t *testing.T) {
 	}
 }
 
-func TestCharacterLimit(t *testing.T) {
-	var message = "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+func Test251CharacterMessage(t *testing.T) {
+	t.Log("Using a message with 251 characters... (expecting err)")
 
-	_, err := SignMessage(message)
+	message := "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+
+	_, err := SignMessage(message, getEcdsaPrivKey())
 	if err == nil {
 		t.Errorf("Expected there to be an error at 251 characters")
 	}
+}
 
-	message = "**********************************************************************************************************************************************************************************************************************************************************"
+func Test250CharacterMessage(t *testing.T) {
+	t.Log("Using a message with 250 characters... (expecting no err)")
 
-	_, err = SignMessage(message)
+	message := "**********************************************************************************************************************************************************************************************************************************************************"
+
+	_, err := SignMessage(message, getEcdsaPrivKey())
 	if err != nil {
 		t.Errorf("Did not expect error at 250 characters: %s", err)
 	}
