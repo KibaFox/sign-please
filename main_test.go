@@ -3,8 +3,11 @@ package main
 import (
 	"crypto/ecdsa"
 	"crypto/x509"
+	"encoding/asn1"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"math/big"
 	"testing"
 )
 
@@ -67,5 +70,45 @@ func Test250CharacterMessage(t *testing.T) {
 	_, err := SignMessage(message, getEcdsaPrivKey())
 	if err != nil {
 		t.Errorf("Did not expect error at 250 characters: %s", err)
+	}
+}
+
+func TestVerifySignature(t *testing.T) {
+	t.Log("Verifying the signature with the provided public key...")
+
+	message := "totally valid message"
+
+	result, err := SignMessage(message, getEcdsaPrivKey())
+	if err != nil {
+		t.Errorf("Error creating message: %s", err)
+	}
+
+	msg := SignedMessage{}
+	if err := json.Unmarshal(result, &msg); err != nil {
+		t.Errorf("Error parsing json: %s", err)
+	}
+
+	pubkey, err := PublicKeyFromPem(msg.PubKey)
+	if err != nil {
+		t.Errorf("Error retrieving public key: %s", err)
+	}
+
+	sigBytes, err := base64.StdEncoding.DecodeString(msg.Signature)
+	if err != nil {
+		t.Errorf("Error converting base64 signature to bytes: %s", err)
+	}
+
+	var ecdsaSig struct {
+		R, S *big.Int
+	}
+
+	_, err = asn1.Unmarshal(sigBytes, &ecdsaSig)
+	if err != nil {
+		t.Errorf("Could not unmarshal signature.")
+	}
+
+	isValid := ecdsa.Verify(pubkey, HashMsg(message), ecdsaSig.R, ecdsaSig.S)
+	if !isValid {
+		t.Errorf("The signature is not valid!")
 	}
 }

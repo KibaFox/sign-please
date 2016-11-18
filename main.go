@@ -6,12 +6,14 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/asn1"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"os"
 )
 
@@ -20,6 +22,10 @@ type SignedMessage struct {
 	Message   string `json:"message"`
 	Signature string `json:"signature"`
 	PubKey    string `json:"pubkey"`
+}
+
+type ecdsaSignature struct {
+	R, S *big.Int
 }
 
 // Generate a new ECDSA key.  Uses the nistp384 curve.
@@ -94,14 +100,16 @@ func HashMsg(msg string) []byte {
 // It returns a base64 encoded string representation of the signature and an
 // error if one occurs.
 func SignMsg(msg string, privKey *ecdsa.PrivateKey) (string, error) {
-	var signature []byte
-
 	r, s, err := ecdsa.Sign(rand.Reader, privKey, HashMsg(msg))
 	if err != nil {
 		return "", err
 	}
 
-	signature = append(r.Bytes(), s.Bytes()...)
+	signature, err := asn1.Marshal(ecdsaSignature{r, s})
+	if err != nil {
+		return "", errors.New("Error while converting ecdsa signature to asn1.")
+	}
+
 	return base64.StdEncoding.EncodeToString(signature), nil
 }
 
@@ -111,7 +119,7 @@ func SignMsg(msg string, privKey *ecdsa.PrivateKey) (string, error) {
 // encoded in base64 (RFC 4648).
 func PublicPem(privKey *ecdsa.PrivateKey) string {
 	pub := privKey.PublicKey
-	pubBytes := append(pub.X.Bytes(), pub.Y.Bytes()...)
+	pubBytes := elliptic.Marshal(pub.Curve, pub.X, pub.Y)
 	b64 := base64.StdEncoding.EncodeToString(pubBytes)
 
 	pubBlk := pem.Block{
@@ -121,6 +129,28 @@ func PublicPem(privKey *ecdsa.PrivateKey) string {
 	}
 
 	return string(pem.EncodeToMemory(&pubBlk))
+}
+
+// Decodes an ECDSA public key from it's pem form where the payload is encoded
+// in base64 (RFC 4648).  This assumes the curve is nistp384.
+// Returns an ecdsa.PublicKey and an error if one occurs.
+func PublicKeyFromPem(pemkey string) (*ecdsa.PublicKey, error) {
+	pubBlk, _ := pem.Decode([]byte(pemkey))
+	pub := &ecdsa.PublicKey{
+		Curve: elliptic.P384(),
+	}
+
+	data, err := base64.StdEncoding.DecodeString(string(pubBlk.Bytes))
+	if err != nil {
+		return nil, errors.New("Error while decoding private key from base64")
+	}
+
+	pub.X, pub.Y = elliptic.Unmarshal(pub.Curve, data)
+	if pub.X == nil || pub.Y == nil {
+		return nil, errors.New("Invalid key")
+	}
+
+	return pub, nil
 }
 
 // Sign a message using ECDSA and returns the signed message in a JSON
