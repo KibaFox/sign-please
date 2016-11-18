@@ -2,23 +2,31 @@ package main
 
 import "encoding/json"
 import "fmt"
+import "os"
 
 type SignedMessage struct {
 	Message string `json:"message"`
 }
 
-func HelloWorld() []byte {
-	msg := &SignedMessage{
-		Message: "hello-world"}
+func SignMessage(msg string) []byte {
+	signed := &SignedMessage{
+		Message: msg}
 
-	json, _ := json.Marshal(msg)
-	return json
+	signedj, err := json.Marshal(signed)
+	if err != nil {
+		panic(err)
+	}
+
+	return signedj
 }
 
 func main() {
-	msg := &SignedMessage{
-		Message: "hello-world"}
+	if len(os.Args) != 2 {
+		fmt.Println("Usage:\n\tsign-please \"some-message\"")
+		os.Exit(42)
+	}
 
-	json, _ := json.Marshal(msg)
-	fmt.Println(string(json))
+	arg := os.Args[1]
+	signed := SignMessage(arg)
+	fmt.Println(string(signed))
 }

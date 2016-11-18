@@ -5,9 +5,11 @@ import (
 	"testing"
 )
 
-func TestHelloWorld(t *testing.T) {
+func TestSignMessage(t *testing.T) {
+	var message = "hello-world"
+
 	var result []byte
-	result = HelloWorld()
+	result = SignMessage(message)
 
 	msg := SignedMessage{}
 	if err := json.Unmarshal(result, &msg); err != nil {
