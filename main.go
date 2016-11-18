@@ -1,7 +1,12 @@
 package main
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"os"
@@ -9,6 +14,23 @@ import (
 
 type SignedMessage struct {
 	Message string `json:"message"`
+}
+
+func GenerateKey() {
+	priv, _ := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+
+	privDer, _ := x509.MarshalECPrivateKey(priv)
+
+	privBlk := pem.Block{
+		Type:    "ECDSA PRIVATE KEY",
+		Headers: nil,
+		Bytes:   privDer,
+	}
+
+	f, _ := os.Create("ecdsa")
+	_ = f.Chmod(os.FileMode(int(0600)))
+	_ = pem.Encode(f, &privBlk)
+	defer f.Close()
 }
 
 func SignMessage(msg string) ([]byte, error) {
@@ -32,6 +54,8 @@ func main() {
 		fmt.Println("Usage:\n\tsign-please \"some-message\"")
 		os.Exit(42)
 	}
+
+	GenerateKey()
 
 	arg := os.Args[1]
 	signed, err := SignMessage(arg)
